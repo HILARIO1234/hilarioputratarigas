@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analisis Statistik dan Regresi</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --panel: #ffffff;
+            --primary: #2563eb;
+            --primary-soft: #dbeafe;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --border: #e5e7eb;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin-top: 0;
+        }
+
+        .topbar {
+            background: linear-gradient(135deg, #1d4ed8, #2563eb 60%, #60a5fa);
+            color: #fff;
+            border-radius: 18px;
+            padding: 24px 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.15);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"],
+        button {
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+
+        button {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            opacity: 0.96;
+        }
+
+        .status {
+            margin: 12px 0 20px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 22px;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            text-align: left;
+        }
+
+        th {
+            background: #f8fafc;
+        }
+
+        .stats-grid,
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 18px;
+        }
+
+        .chart-box {
+            height: 300px;
+        }
+
+        .summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .summary-item {
+            background: var(--primary-soft);
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 10px 14px;
+            min-width: 160px;
+        }
+
+        .summary-item small {
+            display: block;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 16px;
+            }
+
+            .topbar {
+                padding: 18px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="topbar">
+            <h1>Analisis Statistik dan Regresi</h1>
+            <p>Upload file CSV berisi kolom <strong>Tidur</strong>, <strong>Belajar</strong>, dan
+                <strong>Nilai</strong>.
+            </p>
+        </header>
+
+        <div class="controls">
+            <input id="fileInput" type="file" accept=".csv,text/csv" />
+            <button id="analyzeBtn" type="button">Analisis Data</button>
+        </div>
+        <div id="status" class="status">Gunakan data contoh default atau unggah CSV Anda.</div>
+
+        <section class="card">
+            <h2>Data</h2>
+            <div id="tableWrap"></div>
+        </section>
+
+        <section class="card">
+            <h2>Statistik Deskriptif</h2>
+            <div id="descriptiveWrap"></div>
+        </section>
+
+        <section class="card">
+            <h2>Z-Score</h2>
+            <div id="zscoreWrap"></div>
+        </section>
+
+        <section class="chart-grid">
+            <div class="card chart-box">
+                <canvas id="histTidur"></canvas>
+            </div>
+            <div class="card chart-box">
+                <canvas id="histBelajar"></canvas>
+            </div>
+            <div class="card chart-box">
+                <canvas id="histNilai"></canvas>
+            </div>
+        </section>
+
+        <section class="chart-grid">
+            <div class="card chart-box">
+                <canvas id="scatterTidur"></canvas>
+            </div>
+            <div class="card chart-box">
+                <canvas id="scatterBelajar"></canvas>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Regresi Sederhana</h2>
+            <div id="simpleRegressionWrap"></div>
+        </section>
+
+        <section class="card">
+            <h2>Regresi Berganda</h2>
+            <div id="multipleRegressionWrap"></div>
+        </section>
+    </div>
+
+    <script>
+        const defaultCsv = `Tidur,Belajar,Nilai
+6,7,80
+7,8,85
+5,6,70
+8,9,90
+6,8,82
+7,7,78
+9,10,95
+5,7,74
+8,8,88
+6,9,86`;
+
+        const statusEl = document.getElementById('status');
+        const fileInput = document.getElementById('fileInput');
+        const tableWrap = document.getElementById('tableWrap');
+        const descriptiveWrap = document.getElementById('descriptiveWrap');
+        const zscoreWrap = document.getElementById('zscoreWrap');
+        const simpleRegressionWrap = document.getElementById('simpleRegressionWrap');
+        const multipleRegressionWrap = document.getElementById('multipleRegressionWrap');
+
+        function parseCSV(text) {
+            const lines = text.trim().split(/\r?\n/).filter(Boolean);
+            if (lines.length < 2) return [];
+
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(1).map((line) => {
+                const values = line.split(',').map(v => v.trim());
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index] ?? '';
+                });
+                return row;
+            });
+        }
+
+        function toNumber(value) {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : NaN;
+        }
+
+        function mean(values) {
+            return values.reduce((sum, v) => sum + v, 0) / values.length;
+        }
+
+        function variance(values) {
+            const m = mean(values);
+            return values.reduce((sum, v) => sum + (v - m) ** 2, 0) / values.length;
+        }
+
+        function stdDev(values) {
+            return Math.sqrt(variance(values));
+        }
+
+        function formatNumber(value) {
+            return Number.isFinite(value) ? Number(value).toFixed(3) : '0.000';
+        }
+
+        function computeStats(rows, columns) {
+            const stats = {};
+
+            columns.forEach((column) => {
+                const values = rows.map(row => toNumber(row[column])).filter(v => !Number.isNaN(v));
+                if (values.length === 0) return;
+
+                const m = mean(values);
+                const v = variance(values);
+                const s = stdDev(values);
+
+                stats[column] = {
+                    mean: m,
+                    variance: v,
+                    stdDev: s
+                };
+            });
+
+            return stats;
+        }
+
+        function buildTable(headers, rows) {
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const trHead = document.createElement('tr');
+            headers.forEach((header) => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            rows.forEach((row) => {
+                const tr = document.createElement('tr');
+                headers.forEach((header) => {
+                    const td = document.createElement('td');
+                    td.textContent = row[header] ?? '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            return table;
+        }
+
+        function renderDataTable(rows) {
+            if (!rows.length) {
+                tableWrap.innerHTML = '<p>Data kosong.</p>';
+                return;
+            }
+
+            const headers = Object.keys(rows[0]);
+            tableWrap.innerHTML = '';
+            tableWrap.appendChild(buildTable(headers, rows.slice(0, 10)));
+        }
+
+        function renderDescriptiveTable(stats) {
+            const columns = Object.keys(stats);
+            if (!columns.length) {
+                descriptiveWrap.innerHTML = '<p>Tidak ada data numerik.</p>';
+                return;
+            }
+
+            const rows = columns.map((column) => ({
+                Kolom: column,
+                Mean: formatNumber(stats[column].mean),
+                Varians: formatNumber(stats[column].variance),
+                'Std Dev': formatNumber(stats[column].stdDev)
+            }));
+
+            descriptiveWrap.innerHTML = '';
+            descriptiveWrap.appendChild(buildTable(['Kolom', 'Mean', 'Varians', 'Std Dev'], rows));
+        }
+
+        function renderZScores(rows, columns) {
+            const zRows = rows.map((row) => {
+                const result = { ...row };
+                columns.forEach((column) => {
+                    const values = rows.map(r => toNumber(r[column])).filter(v => !Number.isNaN(v));
+                    if (!values.length) return;
+                    const m = mean(values);
+                    const s = stdDev(values);
+                    const value = toNumber(row[column]);
+                    result[`Z_${column}`] = s === 0 ? 0 : (value - m) / s;
+                });
+                return result;
+            });
+
+            const zHeaders = ['Z_' + columns[0], 'Z_' + columns[1], 'Z_' + columns[2]].filter(Boolean);
+            if (!zHeaders.length) {
+                zscoreWrap.innerHTML = '<p>Tidak ada kolom numerik untuk Z-score.</p>';
+                return;
+            }
+
+            const zTableRows = zRows.map((row) => {
+                const out = {};
+                zHeaders.forEach((header) => {
+                    out[header] = formatNumber(row[header]);
+                });
+                return out;
+            });
+
+            zscoreWrap.innerHTML = '';
+            zscoreWrap.appendChild(buildTable(zHeaders, zTableRows));
+        }
+
+        function regressionSimple(xValues, yValues) {
+            const xMean = mean(xValues);
+            const yMean = mean(yValues);
+            const numerator = xValues.reduce((total, x, i) => total + (x - xMean) * (yValues[i] - yMean), 0);
+            const denominator = xValues.reduce((total, x) => total + (x - xMean) ** 2, 0);
+
+            const slope = denominator === 0 ? 0 : numerator / denominator;
+            const intercept = yMean - slope * xMean;
+
+            const predicted = xValues.map((x) => intercept + slope * x);
+            const ssTot = yValues.reduce((sum, y) => sum + (y - yMean) ** 2, 0);
+            const ssRes = yValues.reduce((sum, y, i) => sum + (y - predicted[i]) ** 2, 0);
+            const rSquared = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
+
+            return { intercept, slope, rSquared };
+        }
+
+        function matrixInverse(matrix) {
+            const n = matrix.length;
+            const a = matrix.map(row => [...row]);
+            const inv = Array.from({ length: n }, () => Array(n).fill(0));
+
+            for (let i = 0; i < n; i++) inv[i][i] = 1;
+
+            for (let i = 0; i < n; i++) {
+                let pivot = i;
+                for (let j = i + 1; j < n; j++) {
+                    if (Math.abs(a[j][i]) > Math.abs(a[pivot][i])) pivot = j;
+                }
+                if (pivot !== i) {
+                    [a[i], a[pivot]] = [a[pivot], a[i]];
+                    [inv[i], inv[pivot]] = [inv[pivot], inv[i]];
+                }
+
+                const piv = a[i][i];
+                if (Math.abs(piv) < 1e-12) continue;
+
+                for (let j = 0; j < n; j++) {
+                    a[i][j] /= piv;
+                    inv[i][j] /= piv;
+                }
+
+                for (let k = 0; k < n; k++) {
+                    if (k === i) continue;
+                    const factor = a[k][i];
+                    for (let j = 0; j < n; j++) {
+                        a[k][j] -= factor * a[i][j];
+                        inv[k][j] -= factor * inv[i][j];
+                    }
+                }
+            }
+
+            return inv;
+        }
+
+        function regressionMultiple(rows, xColumns, yColumn) {
+            const yValues = rows.map(row => toNumber(row[yColumn])).filter(v => !Number.isNaN(v));
+            const X = rows.map((row) => [1, ...xColumns.map((col) => toNumber(row[col]))]);
+
+            const XtX = Array.from({ length: xColumns.length + 1 }, () => Array(xColumns.length + 1).fill(0));
+            for (let i = 0; i < X.length; i++) {
+                for (let r = 0; r < XtX.length; r++) {
+                    for (let c = 0; c < XtX.length; c++) {
+                        XtX[r][c] += X[i][r] * X[i][c];
+                    }
+                }
+            }
+
+            const XtY = Array(xColumns.length + 1).fill(0);
+            for (let i = 0; i < X.length; i++) {
+                for (let r = 0; r < XtY.length; r++) {
+                    XtY[r] += X[i][r] * yValues[i];
+                }
+            }
+
+            const invXtX = matrixInverse(XtX);
+            const coefficients = Array(xColumns.length + 1).fill(0);
+            for (let r = 0; r < coefficients.length; r++) {
+                coefficients[r] = invXtX[r].reduce((sum, v, c) => sum + v * XtY[c], 0);
+            }
+
+            const yMean = mean(yValues);
+            const ssTot = yValues.reduce((sum, y) => sum + (y - yMean) ** 2, 0);
+            const predicted = rows.map((row, idx) => {
+                const intercept = coefficients[0];
+                const sum = xColumns.reduce((total, col, colIndex) => total + coefficients[colIndex + 1] * toNumber(row[col]), 0);
+                return intercept + sum;
+            });
+            const ssRes = rows.reduce((sum, row, idx) => sum + (toNumber(row[yColumn]) - predicted[idx]) ** 2, 0);
+            const rSquared = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
+
+            return { coefficients, rSquared };
+        }
+
+        function renderSimpleRegression(rows) {
+            if (!rows.length) {
+                simpleRegressionWrap.innerHTML = '<p>Data kosong.</p>';
+                return;
+            }
+
+            const xColumnCandidates = ['Tidur', 'Belajar'];
+            const yColumn = 'Nilai';
+            const resultHtml = document.createElement('div');
+
+            xColumnCandidates.forEach((xColumn) => {
+                const xValues = rows.map((row) => toNumber(row[xColumn])).filter(v => !Number.isNaN(v));
+                const yValues = rows.map((row) => toNumber(row[yColumn])).filter(v => !Number.isNaN(v));
+                if (!xValues.length || !yValues.length) return;
+
+                const result = regressionSimple(xValues, yValues);
+                const item = document.createElement('div');
+                item.innerHTML = `
+            <h3>${xColumn} terhadap ${yColumn}</h3>
+            <div class="summary">
+              <div class="summary-item"><small>Intercept</small><strong>${formatNumber(result.intercept)}</strong></div>
+              <div class="summary-item"><small>Slope</small><strong>${formatNumber(result.slope)}</strong></div>
+              <div class="summary-item"><small>R-squared</small><strong>${formatNumber(result.rSquared)}</strong></div>
+            </div>
+          `;
+                resultHtml.appendChild(item);
+            });
+
+            simpleRegressionWrap.innerHTML = '';
+            simpleRegressionWrap.appendChild(resultHtml);
+        }
+
+        function renderMultipleRegression(rows) {
+            if (!rows.length) {
+                multipleRegressionWrap.innerHTML = '<p>Data kosong.</p>';
+                return;
+            }
+
+            const xColumns = ['Tidur', 'Belajar'];
+            const yColumn = 'Nilai';
+            const result = regressionMultiple(rows, xColumns, yColumn);
+            const html = `
+          <div class="summary">
+            <div class="summary-item"><small>Intercept</small><strong>${formatNumber(result.coefficients[0])}</strong></div>
+            <div class="summary-item"><small>Koef. Tidur</small><strong>${formatNumber(result.coefficients[1])}</strong></div>
+            <div class="summary-item"><small>Koef. Belajar</small><strong>${formatNumber(result.coefficients[2])}</strong></div>
+            <div class="summary-item"><small>R-squared</small><strong>${formatNumber(result.rSquared)}</strong></div>
+          </div>
+        `;
+            multipleRegressionWrap.innerHTML = html;
+        }
+
+        function createHistogramChart(canvasId, data, label, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const labels = data.map((_, index) => index + 1);
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label,
+                        data,
+                        borderColor: color,
+                        backgroundColor: color + '66',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: false }
+                    }
+                }
+            });
+        }
+
+        function createScatterChart(canvasId, xValues, yValues, xLabel, yLabel, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: `${xLabel} vs ${yLabel}`,
+                        data: xValues.map((x, index) => ({ x, y: yValues[index] })),
+                        borderColor: color,
+                        backgroundColor: color + '99',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { title: { display: true, text: xLabel } },
+                        y: { title: { display: true, text: yLabel } }
+                    }
+                }
+            });
+        }
+
+        function renderCharts(rows) {
+            const columns = ['Tidur', 'Belajar', 'Nilai'];
+            columns.forEach((column) => {
+                const values = rows.map((row) => toNumber(row[column])).filter(v => !Number.isNaN(v));
+                const colorMap = { Tidur: '#2563eb', Belajar: '#10b981', Nilai: '#f59e0b' };
+                if (column === 'Tidur') {
+                    createHistogramChart('histTidur', values, 'Tidur', colorMap.Tidur);
+                }
+                if (column === 'Belajar') {
+                    createHistogramChart('histBelajar', values, 'Belajar', colorMap.Belajar);
+                }
+                if (column === 'Nilai') {
+                    createHistogramChart('histNilai', values, 'Nilai', colorMap.Nilai);
+                }
+            });
+
+            createScatterChart('scatterTidur', rows.map((row) => toNumber(row.Tidur)).filter(v => !Number.isNaN(v)), rows.map((row) => toNumber(row.Nilai)).filter(v => !Number.isNaN(v)), 'Tidur', 'Nilai', '#2563eb');
+            createScatterChart('scatterBelajar', rows.map((row) => toNumber(row.Belajar)).filter(v => !Number.isNaN(v)), rows.map((row) => toNumber(row.Nilai)).filter(v => !Number.isNaN(v)), 'Belajar', 'Nilai', '#10b981');
+        }
+
+        function analyzeData(text) {
+            const rows = parseCSV(text);
+            if (!rows.length) {
+                statusEl.textContent = 'File CSV tidak valid.';
+                return;
+            }
+
+            const columns = Object.keys(rows[0])
+                .filter((key) => rows.some((row) => !Number.isNaN(toNumber(row[key]))));
+
+            const stats = computeStats(rows, columns);
+            renderDataTable(rows);
+            renderDescriptiveTable(stats);
+            renderZScores(rows, columns);
+            renderSimpleRegression(rows);
+            renderMultipleRegression(rows);
+            renderCharts(rows);
+            statusEl.textContent = `Berhasil menganalisis ${rows.length} baris data.`;
+        }
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = () => analyzeData(reader.result);
+            reader.readAsText(file);
+        });
+
+        document.getElementById('analyzeBtn').addEventListener('click', () => analyzeData(defaultCsv));
+        analyzeData(defaultCsv);
+    </script>
+</body>
+
+</html>
